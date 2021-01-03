@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- TODO: Move styles if more needed past prototype -->
+    <style type="text/css">
+      .led_grid {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .led_grid_canvas {
+        border: 1px solid #eee;
+      }
+
+      .signal_controllers {
+        display: flex;
+        margin-bottom: 10px;
+      }
+
+      .signal_controller_container + .signal_controller_container {
+        margin-left: 10px;
+      }
+
+      .signal_controller {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <section class="led_grid">
+      <h1>LEDs</h1>
+      <div id="signal-controller-container" class="signal_controllers"></div>
+      <canvas id="canvas-container" class="led_grid_canvas" width="512" height="512"></canvas>
+    </section>
+  </body>
+  
+  <script type="text/javascript" src="index.js"></script>
+</html>
