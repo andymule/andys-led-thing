@@ -83,6 +83,28 @@
       flex: 1;
     }
 
+    .global-sep {
+      width: 1px;
+      align-self: stretch;
+      background: #2a2a35;
+    }
+
+    .global-controls input[type="number"] {
+      width: 3.2rem;
+      background: #0a0a0f;
+      border: 1px solid #2a2a35;
+      border-radius: 4px;
+      color: #e0e0e8;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.15rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .global-controls input[type="number"]:focus {
+      outline: none;
+      border-color: #555;
+    }
 
     /* --- Signal cards --- */
 
@@ -225,14 +247,22 @@
       <div class="control-label">
         <span>Speed</span>
         <span class="control-value" data-for="speed">+1.0x</span>
-
       </div>
-      <input type="range" data-param="speed" min="-1" max="1" value="0.27" step="0.001">
+      <input type="range" data-param="speed" min="-1" max="1" value="0.1" step="0.001">
       <div class="control-label">
         <span>Mirror</span>
         <span class="control-value" data-for="mirror">0%</span>
       </div>
       <input type="range" data-param="mirror" min="0" max="1" value="0" step="0.01">
+      <div class="global-sep"></div>
+      <div class="control-label">
+        <span>X</span>
+        <input type="number" id="grid-x" value="32" min="2" max="128">
+      </div>
+      <div class="control-label">
+        <span>Y</span>
+        <input type="number" id="grid-y" value="32" min="2" max="128">
+      </div>
     </div>
     <div id="controls" class="controls"></div>
   </main>

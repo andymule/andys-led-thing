@@ -3,16 +3,27 @@ const TICK_RATE = 100;
 const TWO_PI = Math.PI * 2;
 const INV_PI = 2 / Math.PI;
 const DRIFT_SCALE = 0.002;
+const FREQ_SCALE = 10;
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
+function cubic(v, scale) {
+  return v * v * v * scale;
+}
+
 function geoLabel(v) {
-  const blend = 1 - Math.abs(v);
-  if (blend < 0.01) return 'Linear';
-  if (blend > 0.99) return 'Radial';
-  return `${(blend * 100) | 0}%`;
+  if (v < -0.99) return 'Grid';
+  if (v > 0.99) return 'Linear';
+  if (Math.abs(v) < 0.01) return 'Radial';
+  return v < 0 ? 'Grid\u2013Rad' : 'Rad\u2013Lin';
+}
+
+function freqLabel(raw) {
+  const freq = cubic(raw, FREQ_SCALE);
+  if (Math.abs(freq) < 0.005) return '0';
+  return freq.toFixed(1);
 }
 
 function shapeLabel(v) {
@@ -33,60 +44,84 @@ function cutoffLabel(v) {
   return v > 0 ? `Lo ${(v * 100) | 0}%` : `Hi ${(-v * 100) | 0}%`;
 }
 
+const FREQ_X_DEFAULT = Math.cbrt(1 / FREQ_SCALE);
+
 const SIGNAL_PARAMS = [
-  { key: 'geometry', label: 'Geo',    min: -1, max: 1,   step: 0.01, group: 0, fmt: geoLabel },
-  { key: 'freqX',   label: 'Freq X', min: 0,  max: 10,  step: 0.1,  group: 0, fmt: v => v.toFixed(1) },
-  { key: 'freqY',   label: 'Freq Y', min: 0,  max: 10,  step: 0.1,  group: 0, fmt: v => v.toFixed(1) },
-  { key: 'drift',   label: 'Phase',  min: -1, max: 1,   step: 0.01, group: 0, fmt: phaseLabel },
-  { key: 'shape',   label: 'Shape',  min: 0,  max: 1,   step: 0.01, group: 1, fmt: shapeLabel },
-  { key: 'cutoff',  label: 'Cutoff', min: -1, max: 1,   step: 0.01, group: 1, fmt: cutoffLabel },
+  { key: 'geometry', label: 'Geo',    min: -1, max: 1,    step: 0.01,  group: 0, fmt: geoLabel },
+  { key: 'freqX',   label: 'Freq X', min: -1, max: 1,    step: 0.001, group: 0, fmt: freqLabel },
+  { key: 'freqY',   label: 'Freq Y', min: -1, max: 1,    step: 0.001, group: 0, fmt: freqLabel },
+  { key: 'drift',   label: 'Phase',  min: -1, max: 1,    step: 0.01,  group: 0, fmt: phaseLabel },
+  { key: 'shape',   label: 'Shape',  min: 0,  max: 1,    step: 0.01,  group: 1, fmt: shapeLabel },
+  { key: 'cutoff',  label: 'Cutoff', min: -1, max: 1,    step: 0.01,  group: 1, fmt: cutoffLabel },
 ];
 
 class Signal {
   constructor(name) {
     this.name = name;
-    this.geometry = -1;
-    this.freqX = 1;
+    this.geometry = 1;
+    this.freqX = FREQ_X_DEFAULT;
     this.freqY = 0;
     this.drift = 0;
     this.shape = 0.5;
     this.cutoff = 0;
     this.phase = 0;
+    this._fx = cubic(this.freqX, FREQ_SCALE);
+    this._fy = cubic(this.freqY, FREQ_SCALE);
   }
 
   advancePhase() {
     if (this.drift < 0) {
       this.phase = -this.drift;
     } else if (this.drift > 0) {
-      this.phase += this.drift * DRIFT_SCALE;
+      this.phase = (this.phase + this.drift * DRIFT_SCALE) % 1;
     }
   }
 
-  valueAt(col, row, tick, gridSize) {
-    const nx = col / gridSize - 0.5;
-    const ny = row / gridSize - 0.5;
+  prepareFrame() {
+    this._fx = cubic(this.freqX, FREQ_SCALE);
+    this._fy = cubic(this.freqY, FREQ_SCALE);
+  }
 
-    const linear = (col / gridSize) * this.freqX + (row / gridSize) * this.freqY;
-
-    const dist = Math.sqrt(nx * nx + ny * ny) * 2;
-    const ang = Math.atan2(ny, nx) / TWO_PI;
-    const radial = dist * this.freqX + ang * this.freqY;
-
-    const geo = 1 - Math.abs(this.geometry);
-    const spatial = geo <= 0 ? linear
-                  : geo >= 1 ? radial
-                  : lerp(linear, radial, geo);
-
-    const angle = (spatial + tick / TICK_RATE) * TWO_PI + this.phase * TWO_PI;
+  #waveAt(angle) {
     const s = Math.sin(angle);
-
-    let wave;
     if (this.shape <= 0.5) {
       const tri = INV_PI * Math.asin(s);
-      wave = lerp(tri, s, this.shape * 2);
+      return lerp(tri, s, this.shape * 2);
+    }
+    const sq = s >= 0 ? 1 : -1;
+    return lerp(s, sq, (this.shape - 0.5) * 2);
+  }
+
+  valueAt(col, row, tick, gridX, gridY) {
+    const fx = this._fx;
+    const fy = this._fy;
+    const temporal = tick / TICK_RATE;
+    const phaseT = this.phase * TWO_PI;
+    const g = this.geometry;
+
+    let wave;
+
+    if (g >= 1) {
+      const spatial = (col / gridX) * fx + (row / gridY) * fy;
+      wave = this.#waveAt((spatial + temporal) * TWO_PI + phaseT);
+    } else if (g <= -1) {
+      wave = this.#waveAt(((col / gridX) * fx + temporal) * TWO_PI + phaseT)
+           * this.#waveAt(((row / gridY) * fy + temporal) * TWO_PI + phaseT);
     } else {
-      const sq = s >= 0 ? 1 : -1;
-      wave = lerp(s, sq, (this.shape - 0.5) * 2);
+      const nx = col / gridX - 0.5;
+      const ny = row / gridY - 0.5;
+      const rSpatial = Math.sqrt(nx * nx + ny * ny) * 2 * fx + Math.atan2(ny, nx) / TWO_PI * fy;
+      const rWave = this.#waveAt((rSpatial + temporal) * TWO_PI + phaseT);
+
+      if (g > 0) {
+        const lSpatial = (col / gridX) * fx + (row / gridY) * fy;
+        const lWave = this.#waveAt((lSpatial + temporal) * TWO_PI + phaseT);
+        wave = lerp(rWave, lWave, g);
+      } else {
+        const pWave = this.#waveAt(((col / gridX) * fx + temporal) * TWO_PI + phaseT)
+                    * this.#waveAt(((row / gridY) * fy + temporal) * TWO_PI + phaseT);
+        wave = lerp(rWave, pWave, -g);
+      }
     }
 
     const v = (wave + 1) * 0.5;
@@ -105,10 +140,11 @@ class Signal {
 }
 
 class LED {
-  constructor(x, y, cellSize, col, row) {
+  constructor(x, y, cellWidth, cellHeight, col, row) {
     this.x = x;
     this.y = y;
-    this.cellSize = cellSize;
+    this.cellWidth = cellWidth;
+    this.cellHeight = cellHeight;
     this.col = col;
     this.row = row;
     this.r = 0;
@@ -124,24 +160,26 @@ class LED {
 }
 
 class LEDGrid {
-  constructor(canvas, gridSize = DEFAULT_GRID_SIZE) {
+  constructor(canvas, gridX = DEFAULT_GRID_SIZE, gridY = DEFAULT_GRID_SIZE) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.gridSize = gridSize;
+    this.gridX = gridX;
+    this.gridY = gridY;
     this.tick = 0;
-    this.speed = 0.27 * 0.27 * 0.27 * 50;
+    this.speed = 0.1 * 0.1 * 0.1 * 1000;
     this.mirror = 0;
     this.signals = [new Signal('red'), new Signal('green'), new Signal('blue')];
     this.leds = this.#buildLEDs();
   }
 
   #buildLEDs() {
-    const cellSize = this.canvas.width / this.gridSize;
-    const leds = new Array(this.gridSize * this.gridSize);
-    for (let col = 0; col < this.gridSize; col++) {
-      for (let row = 0; row < this.gridSize; row++) {
-        leds[col * this.gridSize + row] = new LED(
-          col * cellSize, row * cellSize, cellSize, col, row
+    const cellWidth = this.canvas.width / this.gridX;
+    const cellHeight = this.canvas.height / this.gridY;
+    const leds = new Array(this.gridX * this.gridY);
+    for (let col = 0; col < this.gridX; col++) {
+      for (let row = 0; row < this.gridY; row++) {
+        leds[col * this.gridY + row] = new LED(
+          col * cellWidth, row * cellHeight, cellWidth, cellHeight, col, row
         );
       }
     }
@@ -151,8 +189,10 @@ class LEDGrid {
   #update() {
     const [rSig, gSig, bSig] = this.signals;
     const t = this.tick;
-    const gs = this.gridSize;
-    const half = gs / 2;
+    const gx = this.gridX;
+    const gy = this.gridY;
+    const halfX = gx / 2;
+    const halfY = gy / 2;
     const m = this.mirror;
     let mx, my;
     if (m <= 1 / 3) {
@@ -166,13 +206,13 @@ class LEDGrid {
     for (const led of this.leds) {
       let col = led.col;
       let row = led.row;
-      if (mx > 0 && col >= half) col = lerp(col, gs - 1 - col, mx);
-      if (my > 0 && row >= half) row = lerp(row, gs - 1 - row, my);
+      if (mx > 0 && col >= halfX) col = lerp(col, gx - 1 - col, mx);
+      if (my > 0 && row >= halfY) row = lerp(row, gy - 1 - row, my);
 
       led.setColor(
-        rSig.valueAt(col, row, t, gs),
-        gSig.valueAt(col, row, t, gs),
-        bSig.valueAt(col, row, t, gs)
+        rSig.valueAt(col, row, t, gx, gy),
+        gSig.valueAt(col, row, t, gx, gy),
+        bSig.valueAt(col, row, t, gx, gy)
       );
     }
   }
@@ -182,8 +222,14 @@ class LEDGrid {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     for (const led of this.leds) {
       ctx.fillStyle = `rgb(${led.r},${led.g},${led.b})`;
-      ctx.fillRect(led.x, led.y, led.cellSize, led.cellSize);
+      ctx.fillRect(led.x, led.y, led.cellWidth, led.cellHeight);
     }
+  }
+
+  resize(gridX, gridY) {
+    this.gridX = gridX;
+    this.gridY = gridY;
+    this.leds = this.#buildLEDs();
   }
 
   start() {
@@ -191,6 +237,7 @@ class LEDGrid {
       this.tick += this.speed;
       for (const sig of this.signals) {
         sig.advancePhase();
+        sig.prepareFrame();
       }
       this.#update();
       this.#draw();
@@ -211,13 +258,9 @@ const globalEl = document.getElementById('global-controls');
 const speedSlider = globalEl.querySelector('[data-param="speed"]');
 const speedValue = globalEl.querySelector('[data-for="speed"]');
 
-function expSpeed(v) {
-  return v * v * v * 50;
-}
-
 speedSlider.addEventListener('input', (e) => {
   const raw = parseFloat(e.target.value);
-  grid.speed = expSpeed(raw);
+  grid.speed = cubic(raw, 1000);
   speedValue.textContent = Math.abs(grid.speed) < 0.01 ? 'Paused'
     : `${grid.speed > 0 ? '+' : ''}${grid.speed.toFixed(1)}x`;
 });
@@ -269,4 +312,25 @@ for (const signal of grid.signals) {
       card.querySelector(`[data-for="${id}"]`).textContent = param.fmt(signal[param.key]);
     });
   }
+}
+
+// --- Grid Size Controls ---
+
+const gridXInput = document.getElementById('grid-x');
+const gridYInput = document.getElementById('grid-y');
+
+if (gridXInput) {
+  gridXInput.addEventListener('change', () => {
+    const v = Math.max(2, Math.min(128, parseInt(gridXInput.value, 10) || 32));
+    gridXInput.value = v;
+    grid.resize(v, grid.gridY);
+  });
+}
+
+if (gridYInput) {
+  gridYInput.addEventListener('change', () => {
+    const v = Math.max(2, Math.min(128, parseInt(gridYInput.value, 10) || 32));
+    gridYInput.value = v;
+    grid.resize(grid.gridX, v);
+  });
 }
