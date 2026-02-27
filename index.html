@@ -1,42 +1,241 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <!-- TODO: Move styles if more needed past prototype -->
-    <style type="text/css">
-      .led_grid {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-      
-      .led_grid_canvas {
-        border: 1px solid #eee;
-      }
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LED Grid</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-      .signal_controllers {
-        display: flex;
-        margin-bottom: 10px;
-      }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f;
+      color: #e0e0e8;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem;
+    }
 
-      .signal_controller_container + .signal_controller_container {
-        margin-left: 10px;
-      }
+    .app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      max-width: 640px;
+      width: 100%;
+    }
 
-      .signal_controller {
-        display: flex;
-        flex-direction: column;
-        margin-bottom: 10px;
-      }
-    </style>
-  </head>
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #fff;
+    }
 
-  <body>
-    <section class="led_grid">
-      <h1>LEDs</h1>
-      <div id="signal-controller-container" class="signal_controllers"></div>
-      <canvas id="canvas-container" class="led_grid_canvas" width="512" height="512"></canvas>
-    </section>
-  </body>
-  
-  <script type="text/javascript" src="index.js"></script>
+    .canvas-wrapper {
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(100, 100, 255, 0.1);
+      line-height: 0;
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 512px;
+      height: auto;
+      display: block;
+    }
+
+    /* --- Global controls --- */
+
+    .global-controls {
+      width: 100%;
+      background: #16161e;
+      border: 1px solid #2a2a35;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .global-controls .control-label {
+      white-space: nowrap;
+      font-size: 0.7rem;
+      color: #888;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .global-controls .control-value {
+      color: #ccc;
+      font-variant-numeric: tabular-nums;
+      min-width: 3.5em;
+      text-align: right;
+    }
+
+    .global-controls input[type="range"] {
+      flex: 1;
+    }
+
+
+    /* --- Signal cards --- */
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      width: 100%;
+    }
+
+    .signal-card {
+      background: #16161e;
+      border: 1px solid #2a2a35;
+      border-radius: 8px;
+      padding: 0.75rem 0.75rem 0.6rem;
+    }
+
+    .signal-card h2 {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.6rem;
+    }
+
+    .signal-card[data-signal="red"] h2 { color: #ff6b6b; }
+    .signal-card[data-signal="green"] h2 { color: #69db7c; }
+    .signal-card[data-signal="blue"] h2 { color: #74c0fc; }
+
+    .control-group {
+      margin-bottom: 0.4rem;
+    }
+
+    .control-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-sep {
+      border-top: 1px solid #222230;
+      margin: 0.5rem 0;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      color: #666;
+      margin-bottom: 0.15rem;
+    }
+
+    .control-value {
+      color: #aaa;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* --- Range inputs --- */
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      border-radius: 2px;
+      background: #2a2a35;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #555;
+      border: 2px solid #777;
+      transition: background 0.15s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #777;
+    }
+
+    .signal-card[data-signal="red"] input::-webkit-slider-thumb {
+      background: #ff6b6b;
+      border-color: #ff8787;
+    }
+
+    .signal-card[data-signal="green"] input::-webkit-slider-thumb {
+      background: #69db7c;
+      border-color: #8ce99a;
+    }
+
+    .signal-card[data-signal="blue"] input::-webkit-slider-thumb {
+      background: #74c0fc;
+      border-color: #a5d8ff;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid #777;
+      background: #555;
+    }
+
+    .signal-card[data-signal="red"] input::-moz-range-thumb {
+      background: #ff6b6b;
+      border-color: #ff8787;
+    }
+
+    .signal-card[data-signal="green"] input::-moz-range-thumb {
+      background: #69db7c;
+      border-color: #8ce99a;
+    }
+
+    .signal-card[data-signal="blue"] input::-moz-range-thumb {
+      background: #74c0fc;
+      border-color: #a5d8ff;
+    }
+
+    .global-controls input::-webkit-slider-thumb {
+      background: #c0c0c0;
+      border-color: #ddd;
+    }
+
+    .global-controls input::-moz-range-thumb {
+      background: #c0c0c0;
+      border-color: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>LED Grid</h1>
+    <div class="canvas-wrapper">
+      <canvas id="led-canvas" width="512" height="512"></canvas>
+    </div>
+    <div id="global-controls" class="global-controls">
+      <div class="control-label">
+        <span>Speed</span>
+        <span class="control-value" data-for="speed">+1.0x</span>
+
+      </div>
+      <input type="range" data-param="speed" min="-1" max="1" value="0.27" step="0.001">
+      <div class="control-label">
+        <span>Mirror</span>
+        <span class="control-value" data-for="mirror">0%</span>
+      </div>
+      <input type="range" data-param="mirror" min="0" max="1" value="0" step="0.01">
+    </div>
+    <div id="controls" class="controls"></div>
+  </main>
+  <script src="index.js"></script>
+</body>
 </html>
