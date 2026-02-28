@@ -4,6 +4,7 @@ const TWO_PI = Math.PI * 2;
 const INV_PI = 2 / Math.PI;
 const DRIFT_SCALE = 0.002;
 const FREQ_SCALE = 10;
+const MOD_DEPTH = 3;
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
@@ -44,6 +45,11 @@ function cutoffLabel(v) {
   return v > 0 ? `Lo ${(v * 100) | 0}%` : `Hi ${(-v * 100) | 0}%`;
 }
 
+function modLabel(v) {
+  if (Math.abs(v) < 0.005) return 'Off';
+  return `${(v * 100) | 0}%`;
+}
+
 const FREQ_X_DEFAULT = Math.cbrt(1 / FREQ_SCALE);
 
 const SIGNAL_PARAMS = [
@@ -53,6 +59,7 @@ const SIGNAL_PARAMS = [
   { key: 'drift',   label: 'Phase',  min: -1, max: 1,    step: 0.01,  group: 0, fmt: phaseLabel },
   { key: 'shape',   label: 'Shape',  min: 0,  max: 1,    step: 0.01,  group: 1, fmt: shapeLabel },
   { key: 'cutoff',  label: 'Cutoff', min: -1, max: 1,    step: 0.01,  group: 1, fmt: cutoffLabel },
+  { key: 'mod',     label: 'Mod',    min: -1, max: 1,    step: 0.01,  group: 2, fmt: modLabel },
 ];
 
 class Signal {
@@ -64,6 +71,7 @@ class Signal {
     this.drift = 0;
     this.shape = 0.5;
     this.cutoff = 0;
+    this.mod = 0;
     this.phase = 0;
     this._fx = cubic(this.freqX, FREQ_SCALE);
     this._fy = cubic(this.freqY, FREQ_SCALE);
@@ -92,11 +100,11 @@ class Signal {
     return lerp(s, sq, (this.shape - 0.5) * 2);
   }
 
-  valueAt(col, row, tick, gridX, gridY) {
+  valueAt(col, row, tick, gridX, gridY, modSource = 0) {
     const fx = this._fx;
     const fy = this._fy;
     const temporal = tick / TICK_RATE;
-    const phaseT = this.phase * TWO_PI;
+    const phaseT = this.phase * TWO_PI + modSource * this.mod * MOD_DEPTH * TWO_PI;
     const g = this.geometry;
 
     let wave;
@@ -209,11 +217,10 @@ class LEDGrid {
       if (mx > 0 && col >= halfX) col = lerp(col, gx - 1 - col, mx);
       if (my > 0 && row >= halfY) row = lerp(row, gy - 1 - row, my);
 
-      led.setColor(
-        rSig.valueAt(col, row, t, gx, gy),
-        gSig.valueAt(col, row, t, gx, gy),
-        bSig.valueAt(col, row, t, gx, gy)
-      );
+      const r = rSig.valueAt(col, row, t, gx, gy);
+      const g = gSig.valueAt(col, row, t, gx, gy, r);
+      const b = bSig.valueAt(col, row, t, gx, gy, g);
+      led.setColor(r, g, b);
     }
   }
 
