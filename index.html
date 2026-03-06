@@ -51,100 +51,42 @@
       display: block;
     }
 
-    /* --- Global controls --- */
-
-    .global-controls {
-      width: 100%;
-      background: #16161e;
-      border: 1px solid #2a2a35;
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .global-controls .control-label {
-      white-space: nowrap;
-      font-size: 0.7rem;
-      color: #888;
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    .global-controls .control-value {
-      color: #ccc;
-      font-variant-numeric: tabular-nums;
-      min-width: 3.5em;
-      text-align: right;
-    }
-
-    .global-controls input[type="range"] {
-      flex: 1;
-    }
-
-    .global-sep {
-      width: 1px;
-      align-self: stretch;
-      background: #2a2a35;
-    }
-
-    .global-controls input[type="number"] {
-      width: 3.2rem;
-      background: #0a0a0f;
-      border: 1px solid #2a2a35;
-      border-radius: 4px;
-      color: #e0e0e8;
-      font-size: 0.75rem;
-      padding: 0.2rem 0.15rem;
-      text-align: center;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .global-controls input[type="number"]:focus {
-      outline: none;
-      border-color: #555;
-    }
-
-    /* --- Signal cards --- */
+    /* --- Control sections --- */
 
     .controls {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      display: flex;
+      flex-direction: column;
       gap: 0.75rem;
       width: 100%;
     }
 
-    .signal-card {
+    .control-section {
       background: #16161e;
       border: 1px solid #2a2a35;
       border-radius: 8px;
-      padding: 0.75rem 0.75rem 0.6rem;
+      padding: 0.75rem 1rem 0.6rem;
     }
 
-    .signal-card h2 {
-      font-size: 0.7rem;
+    .control-section h2 {
+      font-size: 0.65rem;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
       margin-bottom: 0.6rem;
     }
 
-    .signal-card[data-signal="red"] h2 { color: #ff6b6b; }
-    .signal-card[data-signal="green"] h2 { color: #69db7c; }
-    .signal-card[data-signal="blue"] h2 { color: #74c0fc; }
+    #global-controls h2 { color: #888; }
+
+    .control-section .control-row {
+      display: grid;
+      gap: 0.6rem 1rem;
+    }
+
+    #global-controls .control-row { grid-template-columns: repeat(5, 1fr); }
+    #channel-controls .control-row { grid-template-columns: repeat(7, 1fr); column-gap: 0.5rem; }
 
     .control-group {
-      margin-bottom: 0.4rem;
-    }
-
-    .control-group:last-child {
-      margin-bottom: 0;
-    }
-
-    .control-sep {
-      border-top: 1px solid #222230;
-      margin: 0.5rem 0;
+      min-width: 0;
     }
 
     .control-label {
@@ -158,6 +100,98 @@
     .control-value {
       color: #aaa;
       font-variant-numeric: tabular-nums;
+    }
+
+    #channel-controls .param-name {
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    #channel-controls .param-name.animating {
+      color: var(--ch-border);
+      text-decoration: underline;
+    }
+
+    /* --- Channel toggle --- */
+
+    .channel-toggle {
+      display: flex;
+      background: #16161e;
+      border: 1px solid #2a2a35;
+      border-radius: 6px;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .ch-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #555;
+      font-family: inherit;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      padding: 0.4rem 0;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .ch-btn:hover { color: #999; }
+
+    .ch-btn[data-ch="0"].active { background: rgba(255, 68, 68, 0.2); color: #ff6666; }
+    .ch-btn[data-ch="1"].active { background: rgba(68, 204, 68, 0.2); color: #66dd66; }
+    .ch-btn[data-ch="2"].active { background: rgba(68, 136, 255, 0.2); color: #66aaff; }
+
+    /* --- Channel controls dynamic theming --- */
+
+    #channel-controls {
+      --ch-bg: #ff4444;
+      --ch-border: #ff6666;
+      border-color: var(--ch-border);
+    }
+
+    #channel-controls input::-webkit-slider-thumb {
+      background: var(--ch-bg);
+      border-color: var(--ch-border);
+    }
+
+    #channel-controls input::-moz-range-thumb {
+      background: var(--ch-bg);
+      border-color: var(--ch-border);
+    }
+
+    /* --- Grid size footer --- */
+
+    .grid-size {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.65rem;
+      color: #555;
+    }
+
+    .grid-size label {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .grid-size input[type="number"] {
+      width: 3rem;
+      background: #0a0a0f;
+      border: 1px solid #2a2a35;
+      border-radius: 4px;
+      color: #e0e0e8;
+      font-size: 0.7rem;
+      padding: 0.15rem 0.2rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .grid-size input[type="number"]:focus {
+      outline: none;
+      border-color: #555;
     }
 
     /* --- Range inputs --- */
@@ -179,61 +213,21 @@
       width: 12px;
       height: 12px;
       border-radius: 50%;
-      background: #555;
-      border: 2px solid #777;
+      background: #888;
+      border: 2px solid #aaa;
       transition: background 0.15s;
     }
 
     input[type="range"]::-webkit-slider-thumb:hover {
-      background: #777;
-    }
-
-    .signal-card[data-signal="red"] input::-webkit-slider-thumb {
-      background: #ff6b6b;
-      border-color: #ff8787;
-    }
-
-    .signal-card[data-signal="green"] input::-webkit-slider-thumb {
-      background: #69db7c;
-      border-color: #8ce99a;
-    }
-
-    .signal-card[data-signal="blue"] input::-webkit-slider-thumb {
-      background: #74c0fc;
-      border-color: #a5d8ff;
+      background: #aaa;
     }
 
     input[type="range"]::-moz-range-thumb {
       width: 12px;
       height: 12px;
       border-radius: 50%;
-      border: 2px solid #777;
-      background: #555;
-    }
-
-    .signal-card[data-signal="red"] input::-moz-range-thumb {
-      background: #ff6b6b;
-      border-color: #ff8787;
-    }
-
-    .signal-card[data-signal="green"] input::-moz-range-thumb {
-      background: #69db7c;
-      border-color: #8ce99a;
-    }
-
-    .signal-card[data-signal="blue"] input::-moz-range-thumb {
-      background: #74c0fc;
-      border-color: #a5d8ff;
-    }
-
-    .global-controls input::-webkit-slider-thumb {
-      background: #c0c0c0;
-      border-color: #ddd;
-    }
-
-    .global-controls input::-moz-range-thumb {
-      background: #c0c0c0;
-      border-color: #ddd;
+      border: 2px solid #aaa;
+      background: #888;
     }
   </style>
 </head>
@@ -243,28 +237,24 @@
     <div class="canvas-wrapper">
       <canvas id="led-canvas" width="512" height="512"></canvas>
     </div>
-    <div id="global-controls" class="global-controls">
-      <div class="control-label">
-        <span>Speed</span>
-        <span class="control-value" data-for="speed">+1.0x</span>
+    <div class="controls">
+      <div id="global-controls" class="control-section">
+        <h2>Global</h2>
+        <div class="control-row"></div>
       </div>
-      <input type="range" data-param="speed" min="-1" max="1" value="0.1" step="0.001">
-      <div class="control-label">
-        <span>Mirror</span>
-        <span class="control-value" data-for="mirror">0%</span>
+      <div class="channel-toggle">
+        <button class="ch-btn active" data-ch="0">Red</button>
+        <button class="ch-btn" data-ch="1">Green</button>
+        <button class="ch-btn" data-ch="2">Blue</button>
       </div>
-      <input type="range" data-param="mirror" min="0" max="1" value="0" step="0.01">
-      <div class="global-sep"></div>
-      <div class="control-label">
-        <span>X</span>
-        <input type="number" id="grid-x" value="32" min="2" max="128">
-      </div>
-      <div class="control-label">
-        <span>Y</span>
-        <input type="number" id="grid-y" value="32" min="2" max="128">
+      <div id="channel-controls" class="control-section">
+        <div class="control-row"></div>
       </div>
     </div>
-    <div id="controls" class="controls"></div>
+    <div class="grid-size">
+      <label>X <input type="number" id="grid-x" value="32" min="2" max="128"></label>
+      <label>Y <input type="number" id="grid-y" value="32" min="2" max="128"></label>
+    </div>
   </main>
   <script src="index.js"></script>
 </body>

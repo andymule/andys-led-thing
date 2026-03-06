@@ -7,22 +7,28 @@ Open http://localhost:3000
 
 Web simulator for a generative RGB LED matrix. Prototype for an Arduino build (CV rack module or knob-based toy).
 
-Three independent R/G/B signal channels drive a 32x32 grid. All controls are analog sliders, mapping 1:1 to physical knobs.
+One master signal drives a 32x32 grid. Color emerges from spreading phase and frequency across R/G/B channels using golden-angle offsets, then rotating through hue space. All controls are analog sliders, mapping 1:1 to physical knobs.
 
-## Controls
+## Controls (13 knobs)
 
-**Global (2):** Speed (exponential ±1000x), Mirror (sweeps Off→X→Y→XY)
+**Global (3):** Speed (exponential ±1000×), Mirror (sweeps Off→X→Y→XY), Feedback (prev frame → phase modulation)
 
-**Per channel (7 × 3 = 21):**
+**Pattern (5):**
 
 | Knob | Range | What it does |
 |------|-------|-------------|
 | Geo | -1 to 1 | Grid (-1) ↔ Radial (0) ↔ Linear (1) |
-| Freq X | ±10 (cubic) | Wave density / ring density / column density |
-| Freq Y | ±10 (cubic) | Wave angle / spiral twist / row density |
+| Freq | ±10 (cubic) | Pattern density (polar magnitude) |
+| Dir | -180° to 180° | Pattern angle (polar direction) |
 | Phase | -1 to 1 | Left: static offset (0°–360°). Right: auto-drift |
 | Shape | 0 to 1 | Triangle → Sine → Square |
-| Cutoff | -1 to 1 | Drop lows (right) or drop highs (left) with rescale |
-| Mod | -1 to 1 | Cross-channel FM. Chain: Red → Green → Blue |
 
-23 knobs total.
+**Color (5):**
+
+| Knob | Range | What it does |
+|------|-------|-------------|
+| Cutoff | -1 to 1 | Drop lows (right) or drop highs (left) with rescale |
+| Hue | 0°–360° | Rotates R/G/B assignment around the color wheel |
+| Φ Spread | 0–100% | Phase offset across channels (golden angle: 0°/137°/275°) |
+| F Spread | ±100% | Frequency divergence across channels (golden ratio) |
+| FM | ±100% | Cross-channel frequency modulation (R → G → B chain) |
