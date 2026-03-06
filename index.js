@@ -8,9 +8,78 @@ const MOD_DEPTH = 3;
 const FEEDBACK_DEPTH = Math.PI;
 const INV_SQRT3 = 1 / Math.sqrt(3);
 
+const KNOB_SIZE = 40;
+const KNOB_DIM = '#2a2a35';
+const KNOB_GRAY = '#888';
+
 function lerp(a, b, t) { return a + (b - a) * t; }
 function cubic(v, scale) { return v * v * v * scale; }
 function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+// --- Knob Rendering ---
+
+function drawKnob(ctx, normalized, litColor, dimColor) {
+  const size = KNOB_SIZE;
+  const cx = size / 2, cy = size / 2;
+  const radius = size / 2 - 4;
+
+  ctx.clearRect(0, 0, size, size);
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, TWO_PI);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = dimColor;
+  ctx.stroke();
+
+  const angle = -Math.PI / 2 + normalized * TWO_PI;
+  ctx.beginPath();
+  ctx.arc(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius, 3.5, 0, TWO_PI);
+  ctx.fillStyle = litColor;
+  ctx.fill();
+}
+
+function createKnobCanvas() {
+  const canvas = document.createElement('canvas');
+  canvas.className = 'knob';
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = KNOB_SIZE * dpr;
+  canvas.height = KNOB_SIZE * dpr;
+  canvas.style.width = KNOB_SIZE + 'px';
+  canvas.style.height = KNOB_SIZE + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { canvas, ctx };
+}
+
+function attachKnobDrag(canvas, getVal, onDrag, min, max) {
+  function startDrag(startY, startVal) {
+    const range = max - min;
+    function onMove(y) {
+      const dy = startY - y;
+      onDrag(Math.max(min, Math.min(max, startVal + dy * range / 150)));
+    }
+    function onEnd() {
+      document.removeEventListener('mousemove', mm);
+      document.removeEventListener('mouseup', onEnd);
+      document.removeEventListener('touchmove', tm);
+      document.removeEventListener('touchend', onEnd);
+    }
+    const mm = (e) => onMove(e.clientY);
+    const tm = (e) => { e.preventDefault(); onMove(e.touches[0].clientY); };
+    document.addEventListener('mousemove', mm);
+    document.addEventListener('mouseup', onEnd);
+    document.addEventListener('touchmove', tm, { passive: false });
+    document.addEventListener('touchend', onEnd);
+  }
+  canvas.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startDrag(e.clientY, getVal());
+  });
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startDrag(e.touches[0].clientY, getVal());
+  }, { passive: false });
+}
 
 // --- Label Formatters ---
 
@@ -86,12 +155,16 @@ function feedbackLabel(v) {
 const FREQ_DEFAULT = Math.cbrt(1 / FREQ_SCALE);
 
 const GLOBAL_PARAMS = [
-  { key: 'speed',       label: 'Speed',    min: -1, max: 1, step: 0.01, val: 0.1, fmt: speedLabel },
-  { key: 'mirror',      label: 'Mirror',   min: 0,  max: 1, step: 0.01, val: 0,   fmt: mirrorLabel },
-  { key: 'feedback',    label: 'Feedback', min: -1, max: 1, step: 0.01, val: 0,   fmt: feedbackLabel },
-  { key: 'hueRotation', label: 'Hue',      min: 0,  max: 1, step: 0.01, val: 0,   fmt: hueLabel },
-  { key: 'modDepth',    label: 'FM',       min: -1, max: 1, step: 0.01, val: 0,   fmt: modLabel },
+  { key: 'speed',       label: 'Speed',    min: -1, max: 1, step: 0.01, val: 0.1, fmt: speedLabel,    mode: 'bounce' },
+  { key: 'mirror',      label: 'Mirror',   min: 0,  max: 1, step: 0.01, val: 0,   fmt: mirrorLabel,   mode: 'wrap' },
+  { key: 'feedback',    label: 'Feedback', min: -1, max: 1, step: 0.01, val: 0,   fmt: feedbackLabel, mode: 'bounce' },
+  { key: 'hueRotation', label: 'Hue',      min: 0,  max: 1, step: 0.01, val: 0,   fmt: hueLabel,      mode: 'wrap' },
+  { key: 'modDepth',    label: 'FM',       min: -1, max: 1, step: 0.01, val: 0,   fmt: modLabel,      mode: 'bounce' },
 ];
+
+const globalAnim = { speed: false, mirror: false, feedback: false, hueRotation: false, modDepth: false };
+const globalAcc = { speed: 0, mirror: 0, feedback: 0, hueRotation: 0, modDepth: 0 };
+const globalRate = { speed: 0, mirror: 0, feedback: 0, hueRotation: 0, modDepth: 0 };
 
 const CHANNEL_PARAMS = [
   { key: 'geo',    label: 'Geo',    min: -1, max: 1, step: 0.01,  fmt: geoLabel },
@@ -339,6 +412,17 @@ class LEDGrid {
 
   start() {
     const frame = () => {
+      for (const p of GLOBAL_PARAMS) {
+        if (globalAnim[p.key]) {
+          globalAcc[p.key] = (globalAcc[p.key] + globalRate[p.key] * ANIM_SCALE + 1) % 1;
+          const t = globalAcc[p.key];
+          const eff = p.mode === 'bounce'
+            ? p.min + (1 - Math.abs(2 * t - 1)) * (p.max - p.min)
+            : p.min + t * (p.max - p.min);
+          if (p.key === 'speed') this.speed = cubic(eff, 1000);
+          else this[p.key] = eff;
+        }
+      }
       this.tick += this.speed;
       for (let ch = 0; ch < 3; ch++) {
         const c = this.channels[ch];
@@ -364,28 +448,76 @@ grid.start();
 
 // --- Global Controls ---
 
+const globalControls = [];
+
+function globalEffValue(p) {
+  const t = globalAcc[p.key];
+  return p.mode === 'bounce'
+    ? p.min + (1 - Math.abs(2 * t - 1)) * (p.max - p.min)
+    : p.min + t * (p.max - p.min);
+}
+
 function buildGlobalSection(containerId, params) {
   const row = document.querySelector(`#${containerId} .control-row`);
+
   for (const param of params) {
+    let rawVal = param.val;
+
     const group = document.createElement('div');
     group.className = 'control-group';
-    group.innerHTML = `
-      <div class="control-label">
-        <span>${param.label}</span>
-        <span class="control-value">${param.fmt(param.val)}</span>
-      </div>
-      <input type="range"
-             min="${param.min}" max="${param.max}" value="${param.val}" step="${param.step}">`;
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'param-name';
+    nameEl.textContent = param.label;
+
+    const { canvas, ctx } = createKnobCanvas();
+
+    const valueEl = document.createElement('span');
+    valueEl.className = 'control-value';
+    valueEl.textContent = param.fmt(param.val);
+
+    group.appendChild(nameEl);
+    group.appendChild(canvas);
+    group.appendChild(valueEl);
     row.appendChild(group);
 
-    group.querySelector('input').addEventListener('input', (e) => {
-      const raw = parseFloat(e.target.value);
-      if (param.key === 'speed') {
-        grid.speed = cubic(raw, 1000);
+    attachKnobDrag(canvas,
+      () => globalAnim[param.key] ? globalRate[param.key] : rawVal,
+      (v) => {
+        if (globalAnim[param.key]) {
+          globalRate[param.key] = v;
+        } else {
+          rawVal = v;
+          if (param.key === 'speed') grid.speed = cubic(v, 1000);
+          else grid[param.key] = v;
+          valueEl.textContent = param.fmt(v);
+          drawKnob(ctx, (v - param.min) / (param.max - param.min), KNOB_GRAY, KNOB_DIM);
+        }
+      }, param.min, param.max);
+
+    nameEl.addEventListener('click', () => {
+      if (globalAnim[param.key]) {
+        const eff = globalEffValue(param);
+        rawVal = eff;
+        if (param.key === 'speed') grid.speed = cubic(eff, 1000);
+        else grid[param.key] = eff;
+        globalAnim[param.key] = false;
+        valueEl.textContent = param.fmt(eff);
+        nameEl.classList.remove('animating');
+        drawKnob(ctx, (eff - param.min) / (param.max - param.min), KNOB_GRAY, KNOB_DIM);
       } else {
-        grid[param.key] = raw;
+        globalAcc[param.key] = (rawVal - param.min) / (param.max - param.min);
+        globalRate[param.key] = rawVal;
+        globalAnim[param.key] = true;
+        nameEl.classList.add('animating');
       }
-      group.querySelector('.control-value').textContent = param.fmt(raw);
+    });
+
+    drawKnob(ctx, (rawVal - param.min) / (param.max - param.min), KNOB_GRAY, KNOB_DIM);
+
+    globalControls.push({
+      key: param.key, ctx, valueEl, nameEl,
+      fmt: param.fmt, min: param.min, max: param.max, mode: param.mode,
     });
   }
 }
@@ -409,29 +541,39 @@ function buildChannelSection(containerId, params) {
 
     const group = document.createElement('div');
     group.className = 'control-group';
-    group.innerHTML = `
-      <div class="control-label">
-        <span class="param-name${isAnim ? ' animating' : ''}">${param.label}</span>
-        <span class="control-value">${param.fmt(displayVal)}</span>
-      </div>
-      <input type="range"
-             min="${param.min}" max="${param.max}" value="${ch[param.key]}" step="${param.step}">`;
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'param-name' + (isAnim ? ' animating' : '');
+    nameEl.textContent = param.label;
+
+    const { canvas, ctx } = createKnobCanvas();
+
+    const valueEl = document.createElement('span');
+    valueEl.className = 'control-value';
+    valueEl.textContent = param.fmt(displayVal);
+
+    group.appendChild(nameEl);
+    group.appendChild(canvas);
+    group.appendChild(valueEl);
     row.appendChild(group);
 
-    const input = group.querySelector('input');
-    const valueEl = group.querySelector('.control-value');
-    const nameEl = group.querySelector('.param-name');
+    attachKnobDrag(canvas,
+      () => grid.channels[selectedChannel][param.key],
+      (v) => {
+        grid.channels[selectedChannel][param.key] = v;
+        if (!grid.channels[selectedChannel].anim[param.key]) {
+          valueEl.textContent = param.fmt(v);
+          drawKnob(ctx, (v - param.min) / (param.max - param.min),
+            CHANNEL_COLORS[selectedChannel].bg, KNOB_DIM);
+        }
+      },
+      param.min, param.max);
 
-    input.addEventListener('input', (e) => {
-      const raw = parseFloat(e.target.value);
-      grid.channels[selectedChannel][param.key] = raw;
-      if (!grid.channels[selectedChannel].anim[param.key]) {
-        valueEl.textContent = param.fmt(raw);
-      }
-    });
+    const norm = (displayVal - param.min) / (param.max - param.min);
+    drawKnob(ctx, norm, CHANNEL_COLORS[0].bg, KNOB_DIM);
 
     controls.push({
-      key: param.key, input, valueEl, nameEl,
+      key: param.key, ctx, canvas, valueEl, nameEl,
       fmt: param.fmt, min: param.min, max: param.max,
     });
   }
@@ -445,14 +587,15 @@ const channelControls = buildChannelSection('channel-controls', CHANNEL_PARAMS);
 
 function toggleAnimation(ctrl) {
   const ch = grid.channels[selectedChannel];
+  const colors = CHANNEL_COLORS[selectedChannel];
 
   if (ch.anim[ctrl.key]) {
     const effVal = ctrl.min + ch.acc[ctrl.key] * (ctrl.max - ctrl.min);
     ch[ctrl.key] = effVal;
     ch.anim[ctrl.key] = false;
-    ctrl.input.value = effVal;
     ctrl.valueEl.textContent = ctrl.fmt(effVal);
     ctrl.nameEl.classList.remove('animating');
+    drawKnob(ctrl.ctx, (effVal - ctrl.min) / (ctrl.max - ctrl.min), colors.bg, KNOB_DIM);
   } else {
     ch.acc[ctrl.key] = (ch[ctrl.key] - ctrl.min) / (ctrl.max - ctrl.min);
     ch.anim[ctrl.key] = true;
@@ -464,37 +607,52 @@ for (const ctrl of channelControls) {
   ctrl.nameEl.addEventListener('click', () => toggleAnimation(ctrl));
 }
 
-// --- Live Label Updates ---
+// --- Per-Frame UI Update ---
 
-function updateAnimatedLabels() {
+function updateUI() {
+  for (const ctrl of globalControls) {
+    if (globalAnim[ctrl.key]) {
+      const t = globalAcc[ctrl.key];
+      const effNorm = ctrl.mode === 'bounce' ? 1 - Math.abs(2 * t - 1) : t;
+      const eff = ctrl.min + effNorm * (ctrl.max - ctrl.min);
+      drawKnob(ctrl.ctx, effNorm, KNOB_GRAY, KNOB_DIM);
+      ctrl.valueEl.textContent = ctrl.fmt(eff);
+    }
+  }
+
   const ch = grid.channels[selectedChannel];
+  const colors = CHANNEL_COLORS[selectedChannel];
+
   for (const ctrl of channelControls) {
     if (ch.anim[ctrl.key]) {
-      const effVal = ctrl.min + ch.acc[ctrl.key] * (ctrl.max - ctrl.min);
-      ctrl.valueEl.textContent = ctrl.fmt(effVal);
+      const displayVal = ctrl.min + ch.acc[ctrl.key] * (ctrl.max - ctrl.min);
+      drawKnob(ctrl.ctx, ch.acc[ctrl.key], colors.bg, KNOB_DIM);
+      ctrl.valueEl.textContent = ctrl.fmt(displayVal);
     }
   }
 }
 
-grid.onFrame = updateAnimatedLabels;
+grid.onFrame = updateUI;
 
 // --- Channel Switching ---
 
 function switchChannel(ch) {
   selectedChannel = ch;
   const data = grid.channels[ch];
+  const colors = CHANNEL_COLORS[ch];
+
   for (const ctrl of channelControls) {
     const isAnim = data.anim[ctrl.key];
     ctrl.nameEl.classList.toggle('animating', isAnim);
-    ctrl.input.value = data[ctrl.key];
-    if (isAnim) {
-      const effVal = ctrl.min + data.acc[ctrl.key] * (ctrl.max - ctrl.min);
-      ctrl.valueEl.textContent = ctrl.fmt(effVal);
-    } else {
-      ctrl.valueEl.textContent = ctrl.fmt(data[ctrl.key]);
-    }
+
+    const displayVal = isAnim
+      ? ctrl.min + data.acc[ctrl.key] * (ctrl.max - ctrl.min)
+      : data[ctrl.key];
+    const norm = (displayVal - ctrl.min) / (ctrl.max - ctrl.min);
+    ctrl.valueEl.textContent = ctrl.fmt(displayVal);
+    drawKnob(ctrl.ctx, norm, colors.bg, KNOB_DIM);
   }
-  const colors = CHANNEL_COLORS[ch];
+
   const section = document.getElementById('channel-controls');
   section.style.setProperty('--ch-bg', colors.bg);
   section.style.setProperty('--ch-border', colors.border);

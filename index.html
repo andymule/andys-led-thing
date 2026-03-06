@@ -44,7 +44,7 @@
       line-height: 0;
     }
 
-    canvas {
+    .canvas-wrapper canvas {
       width: 100%;
       max-width: 512px;
       height: auto;
@@ -64,7 +64,7 @@
       background: #16161e;
       border: 1px solid #2a2a35;
       border-radius: 8px;
-      padding: 0.75rem 1rem 0.6rem;
+      padding: 0.75rem 0.5rem 0.5rem;
     }
 
     .control-section h2 {
@@ -72,43 +72,55 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      margin-bottom: 0.6rem;
+      margin-bottom: 0.5rem;
+      text-align: center;
     }
 
     #global-controls h2 { color: #888; }
 
     .control-section .control-row {
       display: grid;
-      gap: 0.6rem 1rem;
+      gap: 0.4rem 0.25rem;
     }
 
     #global-controls .control-row { grid-template-columns: repeat(5, 1fr); }
-    #channel-controls .control-row { grid-template-columns: repeat(7, 1fr); column-gap: 0.5rem; }
+    #channel-controls .control-row { grid-template-columns: repeat(7, 1fr); }
 
     .control-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.1rem;
       min-width: 0;
     }
 
-    .control-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.65rem;
+    .param-name {
+      font-size: 0.6rem;
       color: #666;
-      margin-bottom: 0.15rem;
+      white-space: nowrap;
     }
 
     .control-value {
+      font-size: 0.55rem;
       color: #aaa;
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
 
-    #channel-controls .param-name {
+    .knob {
+      cursor: ns-resize;
+      display: block;
+    }
+
+    /* --- Animation toggle --- */
+
+    .param-name {
       cursor: pointer;
       transition: color 0.15s;
     }
 
-    #channel-controls .param-name.animating {
-      color: var(--ch-border);
+    .param-name.animating {
+      color: var(--ch-border, #888);
       text-decoration: underline;
     }
 
@@ -151,16 +163,6 @@
       border-color: var(--ch-border);
     }
 
-    #channel-controls input::-webkit-slider-thumb {
-      background: var(--ch-bg);
-      border-color: var(--ch-border);
-    }
-
-    #channel-controls input::-moz-range-thumb {
-      background: var(--ch-bg);
-      border-color: var(--ch-border);
-    }
-
     /* --- Grid size footer --- */
 
     .grid-size {
@@ -192,42 +194,6 @@
     .grid-size input[type="number"]:focus {
       outline: none;
       border-color: #555;
-    }
-
-    /* --- Range inputs --- */
-
-    input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 3px;
-      border-radius: 2px;
-      background: #2a2a35;
-      outline: none;
-      cursor: pointer;
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #888;
-      border: 2px solid #aaa;
-      transition: background 0.15s;
-    }
-
-    input[type="range"]::-webkit-slider-thumb:hover {
-      background: #aaa;
-    }
-
-    input[type="range"]::-moz-range-thumb {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      border: 2px solid #aaa;
-      background: #888;
     }
   </style>
 </head>
